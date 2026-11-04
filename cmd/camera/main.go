@@ -8,6 +8,9 @@ import (
 	"govision/internal/adapter/storage"
 	"govision/internal/usecase"
 	"image/color"
+	"log/slog"
+	"os"
+	"sync"
 	"time"
 	"uuid"
 
@@ -29,9 +32,16 @@ func main() {
 	sessionID := uuid.New().String() // github.com/google/uuid
 	baseDir := "./pics"
 
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
 	img := gocv.NewMat()
 
-	faceDetector, err := internalGocv.NewFaceDetector(&img, &blue)
+	faceDetector, err := internalGocv.NewFaceDetector(&blue)
+
+	wg := sync.WaitGroup{}
 
 	// open webcam
 	webcam, err := gocv.OpenVideoCapture(deviceID)
@@ -41,20 +51,28 @@ func main() {
 	}
 	defer webcam.Close()
 
-	var provider usecase.CameraProvider = internalGocv.NewProvider(
+	tiker := time.Tick(30 * time.Millisecond)
+
+	c := internalGocv.NewCamera(
+		tiker,
 		webcam,
-		&img,
-		faceDetector,
+		&wg,
+		logger,
 	)
-	var broker usecase.FrameBroker = camera.NewBroker(
+
+	var provider usecase.CameraProvider = internalGocv.NewProvider(
+		faceDetector,
+		c,
+	)
+	var broker = camera.NewBroker(
 		&provider,
 	)
 
-	var picRepository usecase.PicRepository = storage.NewPicStore(baseDir, sessionID)
+	picRepository := storage.NewPicStore(baseDir, sessionID)
 
 	frameSaver := usecase.NewFrameSaverUseCase(
-		&broker,
-		&picRepository,
+		broker,
+		picRepository,
 	)
 	ctx := context.Background()
 

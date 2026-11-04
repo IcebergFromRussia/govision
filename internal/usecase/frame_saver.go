@@ -3,16 +3,27 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"govision/internal/entity"
 )
 
 type FrameSaverUseCase struct {
-	broker        *FrameBroker
-	picRepository *PicRepository
+	broker        FrameBroker
+	picRepository PicRepositoryInterface
+}
+
+type PicRepositoryInterface interface {
+	Store(frame *entity.Frame) (string, error)
+}
+
+type FrameBroker interface {
+	Start(ctx context.Context)
+	Subscribe() <-chan *entity.Frame
+	Stop()
 }
 
 func NewFrameSaverUseCase(
-	broker *FrameBroker,
-	picRepository *PicRepository,
+	broker FrameBroker,
+	picRepository PicRepositoryInterface,
 ) *FrameSaverUseCase {
 	return &FrameSaverUseCase{
 		broker,
@@ -21,7 +32,7 @@ func NewFrameSaverUseCase(
 }
 
 func (f *FrameSaverUseCase) SaveFrame(ctx context.Context) {
-	frameChan := (*f.broker).Subscribe()
+	frameChan := f.broker.Subscribe()
 
 	fmt.Println("ожидаем каритинку")
 
@@ -33,7 +44,7 @@ func (f *FrameSaverUseCase) SaveFrame(ctx context.Context) {
 			if !frame.HasFace {
 				continue
 			}
-			name, err := (*f.picRepository).Store(frame)
+			name, err := f.picRepository.Store(frame)
 			if err != nil {
 				fmt.Println("ошибка во время сохранения файла")
 

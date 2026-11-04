@@ -5,12 +5,6 @@ import (
 	"govision/internal/entity"
 )
 
-type FrameBroker interface {
-	Start(ctx context.Context)
-	Subscribe() <-chan *entity.Frame
-	Stop()
-}
-
 type CameraProvider interface {
 	Start(ctx context.Context) error
 	Stream() <-chan *entity.Frame
@@ -29,8 +23,4 @@ type Window interface {
 type FaceDetector interface {
 	Detect() int
 	Draw()
-}
-
-type PicRepository interface {
-	Store(frame *entity.Frame) (string, error)
 }
