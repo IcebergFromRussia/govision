@@ -2,6 +2,7 @@ package gocv
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -24,13 +25,11 @@ type VideoCaptureInterface interface {
 func NewCamera(
 	ticker <-chan time.Time,
 	videoCapture VideoCaptureInterface,
-	wg *sync.WaitGroup,
 	log *slog.Logger,
 ) *Camera {
 	return &Camera{
 		ticker:       ticker,
 		videoCapture: videoCapture,
-		wg:           wg,
 		log:          log,
 	}
 }
@@ -50,18 +49,14 @@ func (c *Camera) stream(
 	ctx context.Context,
 	img *gocv.Mat,
 ) {
-	c.wg.Add(1)
-	defer c.wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
+
+			fmt.Println("no tick")
 			return
 		case <-c.ticker:
 			c.readFrame(img)
 		}
 	}
 }
-
-// чтение из камеры
-// неудачное чтение из камеры
-// пропуск кадра в канале,

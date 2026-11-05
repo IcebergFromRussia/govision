@@ -10,7 +10,6 @@ import (
 	"image/color"
 	"log/slog"
 	"os"
-	"sync"
 	"time"
 	"uuid"
 
@@ -38,10 +37,13 @@ func main() {
 	slog.SetDefault(logger)
 
 	img := gocv.NewMat()
+	classifier := gocv.NewCascadeClassifier()
 
-	faceDetector, err := internalGocv.NewFaceDetector(&blue)
+	if !classifier.Load("../gocv/data/haarcascade_frontalface_default.xml") {
+		panic("Error reading cascade file: data/haarcascade_frontalface_default.xml")
+	}
 
-	wg := sync.WaitGroup{}
+	faceDetector := internalGocv.NewFaceDetector(&blue, &classifier)
 
 	// open webcam
 	webcam, err := gocv.OpenVideoCapture(deviceID)
@@ -56,7 +58,6 @@ func main() {
 	c := internalGocv.NewCamera(
 		tiker,
 		webcam,
-		&wg,
 		logger,
 	)
 

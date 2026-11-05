@@ -1,7 +1,6 @@
 package gocv
 
 import (
-	"errors"
 	"image"
 	"image/color"
 
@@ -10,21 +9,22 @@ import (
 
 type FaceDetector struct {
 	color      color.RGBA
-	classifier *gocv.CascadeClassifier
+	classifier ClassifierInterface
 	lastRects  []image.Rectangle
 }
 
-func NewFaceDetector(color *color.RGBA) (*FaceDetector, error) {
-	classifier := gocv.NewCascadeClassifier()
+type ClassifierInterface interface {
+	DetectMultiScale(img gocv.Mat) []image.Rectangle
+}
 
-	if !classifier.Load("../gocv/data/haarcascade_frontalface_default.xml") {
-		return nil, errors.New("Error reading cascade file: data/haarcascade_frontalface_default.xml")
-	}
-
+func NewFaceDetector(
+	color *color.RGBA,
+	classifier ClassifierInterface,
+) *FaceDetector {
 	return &FaceDetector{
-		classifier: &classifier,
+		classifier: classifier,
 		color:      *color,
-	}, nil
+	}
 }
 
 func (fd *FaceDetector) Detect(
