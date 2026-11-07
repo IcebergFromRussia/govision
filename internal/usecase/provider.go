@@ -6,9 +6,7 @@ import (
 )
 
 type CameraProvider interface {
-	Start(ctx context.Context) error
-	Stream() <-chan *entity.Frame
-	Stop()
+	Stream(pCtx context.Context) (<-chan *entity.Frame, <-chan struct{})
 }
 
 type FrameRepository interface {

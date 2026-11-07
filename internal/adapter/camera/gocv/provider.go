@@ -2,90 +2,87 @@ package gocv
 
 import (
 	"context"
-	"fmt"
 	"govision/internal/entity"
-	"slices"
+	"log/slog"
+	"time"
 
 	"gocv.io/x/gocv"
 )
 
 type Provider struct {
-	ctx          context.Context
-	cancel       context.CancelFunc
-	done         chan struct{}
 	faceDetector *FaceDetector
 	camera       *Camera
+	encoder      IMEncoderInterface
+	log          *slog.Logger
+	ticker       <-chan time.Time
+}
+
+type IMEncoderInterface interface {
+	IMEncode(img gocv.Mat) ([]byte, error)
 }
 
 func NewProvider(
 	faceDetector *FaceDetector,
+	encoder IMEncoderInterface,
 	camera *Camera,
+	log *slog.Logger,
 ) *Provider {
 	return &Provider{
 		faceDetector: faceDetector,
 		camera:       camera,
+		log:          log,
+		encoder:      encoder,
 	}
 }
 
-func (p *Provider) Start(parent context.Context) error {
-	p.ctx, p.cancel = context.WithCancel(parent)
-	p.done = make(chan struct{})
-
-	return nil
-}
-
-func (p *Provider) Stream() <-chan *entity.Frame {
+func (p *Provider) Stream(pCtx context.Context) (<-chan *entity.Frame, <-chan struct{}) {
 	ch := make(chan *entity.Frame, 1)
 
 	img := gocv.NewMat()
-	go p.camera.stream(p.ctx, &img)
+	ctx, cancel := context.WithCancel(pCtx)
+	go p.camera.stream(ctx, &img)
+
+	done := make(chan struct{})
 
 	go func() {
 		defer close(ch) // закроем выходной канал при выходе
-		defer close(p.done)
 		defer img.Close()
+		defer close(done)
 
 		for {
-			clone := img.Clone()
-			defer clone.Close()
-
-			// кодируем в JPEG/PNG через gocv
-			buf, err := gocv.IMEncode(gocv.JPEGFileExt, clone)
-
-			if err != nil {
-				fmt.Println("НЕ ПОЛУЧАЕТСЯ ФОРМАТИРОВАТЬ КАРТИНКУ") //todo log this
-				continue
-			}
-			detected := p.faceDetector.Detect(&clone)
-			fmt.Println(fmt.Sprintf("Обнаружено %d", detected)) //todo log this
-
-			data := slices.Clone(buf.GetBytes())
-			buf.Close()
-
-			eFrame := entity.Frame{
-				Data:    data,
-				HasFace: detected > 0,
-			}
-
-			fmt.Printf("длинна картинки %d\n", len(eFrame.Data)) //todo log this
 			select {
-			case <-p.ctx.Done():
+			case <-ctx.Done():
+				cancel()
 				return
-			case ch <- &eFrame:
-				fmt.Println("отправляем картинку") //todo log this
-			default:
+			case <-p.ticker:
+				eFrame := p.getFrame(&img)
+				select {
+				case ch <- eFrame:
+				default:
+				}
 			}
 		}
 	}()
 
-	return ch
+	return ch, done
 }
 
-func (p *Provider) Stop() {
-	if p.cancel != nil {
-		p.cancel() // сигнал остановки
+func (p *Provider) getFrame(img *gocv.Mat) *entity.Frame {
+	clone := img.Clone()
+	defer clone.Close()
+
+	data, err := p.encoder.IMEncode(clone)
+
+	if err != nil {
+		p.log.Info("НЕ ПОЛУЧАЕТСЯ ФОРМАТИРОВАТЬ КАРТИНКУ")
+		return nil
 	}
-	if p.done != nil {
-		<-p.done // ждём, пока Stream реально завершится
+	detected := p.faceDetector.Detect(&clone)
+
+	p.log.Info("Обнаружено ебало", slog.Int("detected", detected))
+
+	return &entity.Frame{
+		Data:    data,
+		HasFace: detected > 0,
 	}
 }

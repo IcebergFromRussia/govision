@@ -2,8 +2,6 @@ package gocv
 
 import (
 	"context"
-	"fmt"
-	"sync"
 	"time"
 
 	"log/slog"
@@ -14,7 +12,6 @@ import (
 type Camera struct {
 	videoCapture VideoCaptureInterface
 	ticker       <-chan time.Time
-	wg           *sync.WaitGroup
 	log          *slog.Logger
 }
 
@@ -52,8 +49,6 @@ func (c *Camera) stream(
 	for {
 		select {
 		case <-ctx.Done():
-
-			fmt.Println("no tick")
 			return
 		case <-c.ticker:
 			c.readFrame(img)

@@ -60,10 +60,15 @@ func main() {
 		webcam,
 		logger,
 	)
+	encoder := internalGocv.IMEncoder{
+		FileExt: gocv.JPEGFileExt,
+	}
 
 	var provider usecase.CameraProvider = internalGocv.NewProvider(
 		faceDetector,
+		&encoder,
 		c,
+		logger,
 	)
 	var broker = camera.NewBroker(
 		&provider,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -147,13 +146,11 @@ func createCamera(
 		ticker = make(chan time.Time)
 	}
 
-	wg := sync.WaitGroup{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	camera := Camera{
 		videoCapture: mock,
 		ticker:       ticker,
-		wg:           &wg,
 		log:          logger,
 	}
 
